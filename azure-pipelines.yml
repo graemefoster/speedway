@@ -1,0 +1,87 @@
+# ASP.NET Core (.NET Framework)
+# Build and test ASP.NET Core projects targeting the full .NET Framework.
+# Add steps that publish symbols, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-18.04' 
+  container:
+  variables:
+    solution: '**/*.sln'
+    buildPlatform: 'Any CPU'
+    buildConfiguration: 'Release'
+
+stages:
+- stage: 'Build'
+  displayName: 'Build and unit test'
+  jobs:
+  - job: 'BuildSpeedway'
+    displayName: 'Build Speedway'
+
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        version: '5.0.x'
+        includePreviewVersions: true # Required for preview versions
+
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'restore'
+
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: publish
+        publishWebProjects: True
+        arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: True
+
+    # this code takes all the files in $(Build.ArtifactStagingDirectory) and uploads them as an artifact of your build.
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: '$(Build.ArtifactStagingDirectory)' 
+        artifactName: 'Speedway'
+  
+- stage: 'DeployPipelineBuilder'
+  displayName: 'Deploy Pipeline Builder to azure'
+  jobs:
+  - job: 'DeploySpeedway'
+    displayName: 'Deploy Speedway'
+    variables:
+    - group: Deployment
+
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        artifactName: 'Speedway'
+        downloadPath: '$(System.ArtifactsDirectory)'
+
+    - task: AzureRmWebAppDeployment@4
+      displayName: 'Deploy Pipeline API'
+      inputs:
+        ConnectionType: 'AzureRM'
+        azureSubscription: 'Speedway Service Connection'
+        appType: 'webApp'
+        WebAppName: '$(PipelineApiDev)'
+        packageForLinux: '$(System.ArtifactsDirectory)/Speedway/Speedway.PipelineBuilderApi.zip'
+
+    - task: AzureRmWebAppDeployment@4
+      displayName: 'Deploy Policy API'
+      inputs:
+        ConnectionType: 'AzureRM'
+        azureSubscription: 'Speedway Service Connection'
+        appType: 'webApp'
+        WebAppName: '$(PolicyApiDev)'
+        packageForLinux: '$(System.ArtifactsDirectory)/Speedway/Speedway.Policy.zip'
+
+    - task: AzureRmWebAppDeployment@4
+      displayName: 'Deploy Deployment API'
+      inputs:
+        ConnectionType: 'AzureRM'
+        azureSubscription: 'Speedway Service Connection'
+        appType: 'webApp'
+        WebAppName: '$(DeployApiDev)'
+        packageForLinux: '$(System.ArtifactsDirectory)/Speedway/Speedway.Deploy.zip'

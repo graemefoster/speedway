@@ -1,0 +1,13 @@
+﻿{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Speedway.Cli": {
+      "commandName": "Project",
+      "workingDirectory": "<working-folder>",
+      "commandLineArgs": "container list",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

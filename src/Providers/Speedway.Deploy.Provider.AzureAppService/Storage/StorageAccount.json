@@ -1,0 +1,86 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storageAccountName": {
+      "type": "string"
+    },
+    "containers": {
+      "type": "array",
+      "defaultValue": []
+    },
+    "queues": {
+      "type": "array",
+      "defaultValue": []
+    },
+    "tables": {
+      "type": "array",
+      "defaultValue": []
+    },
+    "tags" : {
+      "type" : "object",
+      "defaultValue": {}
+    }
+  },
+  "variables" : {
+    "hasQueues" : "[not(equals(length(parameters('queues')), 0))]",
+    "hasTables" : "[not(equals(length(parameters('tables')), 0))]",
+    "hasContainers" : "[not(equals(length(parameters('containers')), 0))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2021-01-01",
+      "tags" : "[parameters('tags')]",
+      "name": "[parameters('storageAccountName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Standard_LRS",
+        "tier": "Standard"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot",
+        "allowBlobPublicAccess": false,
+        "minimumTlsVersion": "TLS1_2",
+        "allowSharedKeyAccess" : "[variables('hasTables')]"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2019-06-01",
+      "name": "[concat(parameters('storageAccountName'), '/default/', if(variables('hasContainers'), parameters('containers')[copyIndex()], 'dummy'))]",
+      "dependsOn": [
+        "[parameters('storageAccountName')]"
+      ],
+      "copy": {
+        "name": "containers",
+        "count": "[length(parameters('containers'))]"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/queueServices/queues",
+      "apiVersion": "2019-06-01",
+      "name": "[concat(parameters('storageAccountName'), '/default/', if(variables('hasQueues'), parameters('queues')[copyIndex()], 'dummy'))]",
+      "dependsOn": [
+        "[parameters('storageAccountName')]"
+      ],
+      "copy": {
+        "name": "queues",
+        "count": "[length(parameters('queues'))]"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+      "apiVersion": "2019-06-01",
+      "name": "[concat(parameters('storageAccountName'), '/default/', if(variables('hasTables'), parameters('tables')[copyIndex()], 'dummy'))]",
+      "dependsOn": [
+        "[parameters('storageAccountName')]"
+      ],
+      "copy": {
+        "name": "tables",
+        "count": "[length(parameters('tables'))]"
+      }
+    }
+  ]
+}

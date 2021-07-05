@@ -1,0 +1,343 @@
+﻿{
+  "apiVersion": "1.0",
+  "id": "669c175c-66e4-4fd5-9423-b62c24816891",
+  "slug": "speedway-gf",
+  "displayName": "Created by api",
+  "resources": [
+    {
+      "$type": "storage",
+      "name": "speedwaystorage",
+      "containers": [
+        {
+          "type": "Storage",
+          "name": "buildartifacts"
+        },
+        {
+          "type": "Table",
+          "name": "manifestdeployments"
+        }
+      ],
+      "links": [
+        {
+          "$type": "storageLink",
+          "name": "speedway-pipelinebuilder",
+          "access": "ReadWrite"
+        },
+        {
+          "$type": "storageLink",
+          "name": "speedway-deploy",
+          "access": "ReadWrite"
+        },
+        {
+          "$type": "storageLink",
+          "name": "speedway-policy",
+          "access": "ReadWrite"
+        },
+        {
+          "$type": "storageLink",
+          "name": "speedway-devops",
+          "access": "ReadWrite"
+        },
+        {
+          "$type": "storageLink",
+          "name": "speedway-pipeline-builder-application",
+          "access": "ReadWrite"
+        },
+        {
+          "$type": "storageLink",
+          "name": "speedway-deploy-application",
+          "access": "ReadWrite"
+        }
+      ]
+    },
+    {
+      "$type": "nosql",
+      "name": "speedway-database",
+      "containers" : [ "container-one" ]
+    },
+    {
+      "$type": "secrets",
+      "name": "Default",
+      "links": [
+        {
+          "$type": "secretsLink",
+          "name": "speedway-pipelinebuilder",
+          "access": "Read"
+        },
+        {
+          "$type": "secretsLink",
+          "name": "speedway-deploy",
+          "access": "ReadWrite"
+        },
+        {
+          "$type": "secretsLink",
+          "name": "speedway-policy",
+          "access": "Read"
+        },
+        {
+          "$type": "secretsLink",
+          "name": "speedway-pipeline-builder-application",
+          "access": "Read"
+        },
+        {
+          "$type": "secretsLink",
+          "name": "speedway-deploy-application",
+          "access": "Read"
+        }
+      ]
+    },
+    {
+      "$type": "webapp",
+      "name": "speedway-pipelinebuilder",
+      "configuration": {
+        "AzureAd:ClientId": "[speedway-pipeline-builder-application.ClientId]",
+        "AzureAd:ClientSecret": "[secret.speedway-pipeline-builder-application.ClientSecret]",
+        "PipelineBuilderSettings:PolicyApiUriBase": "[speedway-policy.Uri]",
+        "PipelineBuilderSettings:DeployApiUri": "[speedway-deploy.Uri]",
+        "PipelineBuilderSettings:DevOpsPipelineServicePrincipalSecret": "[secret.speedway-devops.ClientSecret]",
+        "PipelineBuilderSettings:PolicyApiAuthorisationToken": "[secret.speedway-policy.PolicyApiSettings--ApiKey]",
+        "PipelineBuilderSettings:ArtifactStorageName": "[speedwaystorage.PlatformResourceName]",
+        "PipelineBuilderSettings:DeployApiAzureAdApplicationId": "[speedway-deploy-application.ClientId]",
+        "PipelineBuilderSettings:DevOpsPipelineAdApplicationId": "[speedway-devops.ClientId]",
+        "ThisIsATestOfTheTest": "[speedway-policy.Configuration.ThisIsATest]"
+      },
+      "requiredSecretNames": [],
+      "apiDefinitions": {
+        "type": "swagger",
+        "mode": "dynamic",
+        "url": "/swagger/v1/swagger.json"
+      }
+    },
+    {
+      "$type": "webapp",
+      "name": "speedway-policy",
+      "requiredSecretNames": [
+        "PolicyApiSettings--ApiKey"
+      ],
+      "configuration": {
+        "AzureAd:ClientId": "[speedway-policy-oauth-client.ClientId]",
+        "AzureAd:ClientSecret": "[secret.speedway-policy-oauth-client.ClientSecret]",
+        "PolicyApiSettings:PolicyApiAuthorisationToken": "[secret.speedway-policy.PolicyApiSettings--ApiKey]"
+      }
+    },
+    {
+      "$type": "webapp",
+      "name": "speedway-deploy",
+      "configuration": {
+        "AzureAd:ClientId": "[speedway-deploy-application.ClientId]",
+        "AzureAd:ClientSecret": "[secret.speedway-deploy-application.ClientSecret]",
+        "SpeedwaySettings:ArtifactStorageName": "[speedwaystorage.PlatformResourceName]",
+        "SpeedwaySettings:DeployApiAzureManagedIdentityId": "[speedway-deploy.EphemeralIdentityId]",
+        "SpeedwaySettings:ManifestStorageKey": "[secret.speedwaystorage.access-key]",
+        "SpeedwaySettings:DatabaseConnectionString":  "[secret.speedway-database.connection-string]"
+      }
+    },
+    {
+      "$type": "webapp",
+      "name": "opa-api",
+      "webAppDeploymentType": "Container",
+      "container" : {
+        "imageUri" : "openpolicyagent/opa:latest",
+        "run": "run --server",
+        "port" : 8181
+      }
+    },
+    {
+      "$type": "oauthClient",
+      "name": "speedway-devops",
+      "clientType": "Web"
+    },
+    {
+      "$type": "oauthClient",
+      "name": "speedway-cli",
+      "clientType": "Public",
+      "replyUrls": [
+        "http://localhost"
+      ]
+    },
+    {
+      "$type": "oauthClient",
+      "name": "speedway-deploy-application",
+      "clientType": "Web",
+      "replyUrls": [
+        "https://localhost:44388/signin-oidc"
+      ],
+      "redirectsFrom": [
+        "speedway-deploy"
+      ],
+      "roles": [
+        {
+          "name": "access_as_application",
+          "allowedTypes": [
+            "Application"
+          ]
+        }
+      ],
+      "links": [
+        {
+          "$type": "oauthRoleLink",
+          "name": "speedway-devops",
+          "roles": [
+            "access_as_application"
+          ]
+        }
+      ]
+    },
+    {
+      "$type": "oauthClient",
+      "name": "speedway-policy-oauth-client",
+      "clientType": "Web",
+      "replyUrls": [
+        "https://localhost:44388/signin-oidc"
+      ],
+      "redirectsFrom": [
+        "speedway-policy"
+      ],
+      "scopes": [
+        {
+          "name": "Artifacts.ReadWriteAll"
+        }
+      ],
+      "roles": [
+        {
+          "name": "Tester",
+          "allowedTypes": [
+            "User"
+          ]
+        },
+        {
+          "name": "Security",
+          "allowedTypes": [
+            "User"
+          ]
+        },
+        {
+          "name": "Risk",
+          "allowedTypes": [
+            "User"
+          ]
+        }
+      ]
+    },
+    {
+      "$type": "oauthClient",
+      "name": "speedway-pipeline-builder-application",
+      "clientType": "Web",
+      "replyUrls": [
+        "https://localhost:44394/signin-oidc"
+      ],
+      "redirectsFrom": [
+        "speedway-pipelinebuilder"
+      ],
+      "scopes": [
+        {
+          "name": "user_impersonation"
+        }
+      ],
+      "roles": [
+        {
+          "name": "DevopsEngineer",
+          "allowedTypes": [
+            "User"
+          ]
+        }
+      ],
+      "KnownApplications": [
+        "speedway-cli"
+      ],
+      "links": [
+        {
+          "$type": "oauthScopeLink",
+          "name": "speedway-cli",
+          "scopes": [
+            "user_impersonation"
+          ]
+        }
+      ]
+    },
+    {
+      "$type": "preExistingOAuthClient",
+      "name": "azure-devops",
+      "applicationId": "499b84ac-1321-427f-aa17-267ca6975798",
+      "links": [
+        {
+          "$type": "oauthScopeLink",
+          "name": "speedway-pipeline-builder-application",
+          "scopes": [
+            "user_impersonation"
+          ]
+        }
+      ]
+    },
+    {
+      "$type": "preExistingOAuthClient",
+      "name": "graph-api",
+      "applicationId": "00000003-0000-0000-c000-000000000000",
+      "links": [
+        {
+          "$type": "oauthScopeLink",
+          "name": "speedway-pipeline-builder-application",
+          "scopes": [
+            "Application.ReadWrite.All",
+            "AppRoleAssignment.ReadWrite.All",
+            "openid",
+            "profile",
+            "User.Read.All",
+            "User.ReadBasic.All"
+          ]
+        },
+        {
+          "$type": "oauthRoleLink",
+          "name": "speedway-deploy",
+          "roles": [
+            "Application.ReadWrite.All"
+          ]
+        },
+        {
+          "$type": "oauthRoleLink",
+          "name": "speedway-deploy-application",
+          "roles": [
+            "Application.ReadWrite.All"
+          ]
+        }
+      ]
+    },
+    {
+      "$type": "preExistingOAuthClient",
+      "name": "windows-azure-service-management-api",
+      "applicationId": "797f4846-ba00-4fd7-ba43-dac1f8f63013",
+      "links": [
+        {
+          "$type": "oauthScopeLink",
+          "name": "speedway-pipeline-builder-application",
+          "scopes": [
+            "user_impersonation"
+          ]
+        }
+      ]
+    },
+    {
+      "$type": "preExistingOAuthClient",
+      "name": "old-graph-api",
+      "applicationId": "00000002-0000-0000-c000-000000000000",
+      "links": [
+        {
+          "$type": "oauthRoleLink",
+          "name": "speedway-deploy-application",
+          "roles": [
+            "Application.Read.All"
+          ]
+        },
+        {
+          "$type": "oauthRoleLink",
+          "name": "speedway-deploy",
+          "roles": [
+            "Application.Read.All"
+          ]
+        }
+      ]
+    }
+  ],
+  "developers": [
+  ]
+}

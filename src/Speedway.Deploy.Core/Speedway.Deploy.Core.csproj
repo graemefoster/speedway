@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net5.0</TargetFramework>
+        <LangVersion>9</LangVersion>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="FluentValidation" Version="9.5.0" />
+      <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="1.0.8" />
+      <PackageReference Include="Microsoft.Azure.Management.AppService.Fluent" Version="1.37.0" />
+      <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.37.0" />
+      <PackageReference Include="Microsoft.Azure.Management.Graph.RBAC.Fluent" Version="1.37.0" />
+      <PackageReference Include="Microsoft.Azure.Management.KeyVault.Fluent" Version="1.37.0" />
+      <PackageReference Include="Microsoft.Azure.Management.Storage.Fluent" Version="1.37.0" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="5.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="5.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Options" Version="5.0.0" />
+      <PackageReference Include="Microsoft.Graph" Version="3.20.0" />
+      <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="6.8.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Speedway.AzureSdk.Extensions\Speedway.AzureSdk.Extensions.csproj" />
+      <ProjectReference Include="..\Speedway.Core\Speedway.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Resources\PlatformTwins\Azure\WebApp\ArmTemplates\app-insights.json" />
+    </ItemGroup>
+
+</Project>

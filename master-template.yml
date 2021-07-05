@@ -1,0 +1,183 @@
+﻿parameters:
+- name: projectId
+  type: string
+- name: storageAccountName
+  type: string
+- name: deploymentApiUri
+  type: string
+- name: deploymentApiApplicationId
+  type: string
+
+stages:
+  - stage: "Build"
+    displayName: "Build and unit test"
+
+    jobs:
+      - job: "CalculateVersion"
+        displayName: "Calculate Version number"
+        pool:
+          vmImage: "Ubuntu-16.04"
+
+        steps:
+          - task: gitversion/setup@0
+            displayName: Install Gitversion
+            inputs:
+              versionSpec: "5.x"
+
+          - task: gitversion/execute@0
+            displayName: Execute Gitversion
+            name: Version
+            inputs:
+              useConfigFile: true
+              configFilePath: "VersionConfig.yml"
+              updateAssemblyInfoFilename: true
+
+      - job: "CreateArchive"
+        dependsOn: CalculateVersion
+        displayName: "Building archive with build outputs"
+        pool:
+          vmImage: "Ubuntu-16.04"
+
+        variables:
+          - name: Semver
+            value: $[ dependencies.CalculateVersion.outputs['Version.GitVersion.SemVer'] ]
+
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              version: "5.0.x"
+              includePreviewVersions: true
+
+          - bash: echo "Version? ** $(SemVer) **"
+            name: EchoVersionStep
+
+          - task: ShellScript@2
+            inputs:
+              scriptPath: $(Build.Repository.LocalPath)/build.sh
+            env: 
+              BUILD_SEMVER: $(SemVer)
+
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: "VSTest"
+              testResultsFiles: "$(Common.TestResultsDirectory)/**/*.trx"
+              failTaskOnFailedTests: true
+
+          - task: PublishCodeCoverageResults@1
+            inputs:
+              codeCoverageTool: "cobertura"
+              summaryFileLocation: "$(Common.TestResultsDirectory)/**/coverage.cobertura.xml"
+              failIfCoverageEmpty: false
+
+          - task: CopyFiles@2
+            displayName: "Adding speedway manifest to archive"
+            inputs:
+              contents: "$(Build.Repository.LocalPath)/.speedway/manifest.json"
+              flattenFolders: true
+              targetFolder: "$(Build.ArtifactStagingDirectory)/.speedway"
+
+          - task: ArchiveFiles@2
+            displayName: "Creating archive"
+            inputs:
+              rootFolderOrFile: $(Build.ArtifactStagingDirectory)
+              includeRootFolder: false
+              archiveFile: $(Build.ArtifactStagingDirectory)/archive.zip
+              replaceExistingArchive: true
+
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: SpeedwayDeployment-${{ parameters.projectId }}
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az storage blob upload --auth-mode login -f "$(Build.ArtifactStagingDirectory)/archive.zip" -c buildartifacts -n "${{ parameters.projectId }}/$(Build.BuildId)/build.zip" --account-name ${{ parameters.storageAccountName }}
+
+  - stage: "DeployToDev"
+    displayName: "Deploy to development environment"
+    dependsOn: Build
+    condition: succeeded()
+    pool:
+      vmImage: "Ubuntu-16.04"
+    jobs:
+      - deployment: "DeployToDev"
+        environment: "Development"
+        pool:
+          vmImage: "Ubuntu-16.04"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: SpeedwayDeployment-${{ parameters.projectId }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      token=$(az account get-access-token --resource api://${{ parameters.deploymentApiApplicationId }} --query "accessToken" --output tsv)
+                      curl -i -m 1200 -X POST -H 'Accept: application/json' -H 'Content-Type: application/json' -H "Authorization: Bearer $token" --data '{ "speedwayProjectId": "${{ parameters.projectId }}", "buildId" : "$(Build.BuildId)", "environment": "$(Environment.Name)" }' ${{ parameters.deploymentApiUri }}/deploy
+                      echo "DONE"
+
+  - stage: "DeployToTest"
+    displayName: "Deploy to test environment"
+    dependsOn: DeployToDev
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.SourceBranch'], 'refs/heads/release*')) )
+    pool:
+      vmImage: "Ubuntu-16.04"
+    jobs:
+      - deployment: "DeployToTest"
+        environment: "Test"
+        pool:
+          vmImage: "Ubuntu-16.04"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: SpeedwayDeployment-${{ parameters.projectId }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      token=$(az account get-access-token --resource api://${{ parameters.deploymentApiApplicationId }} --query "accessToken" --output tsv)
+                      curl -i -m 1200 -X POST -H 'Accept: application/json' -H 'Content-Type: application/json' -H "Authorization: Bearer $token" --data '{ "speedwayProjectId": "${{ parameters.projectId }}", "buildId" : "$(Build.BuildId)", "environment": "$(Environment.Name)" }' ${{ parameters.deploymentApiUri }}/deploy
+                      echo "DONE"
+
+  - stage: "DeployToProduction"
+    displayName: "Deploy to production environment"
+    dependsOn: DeployToTest
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.SourceBranch'], 'refs/heads/release*')) )
+    pool:
+      vmImage: "Ubuntu-16.04"
+    jobs:
+      - deployment: "DeployToProduction"
+        environment: "Production"
+        pool:
+          vmImage: "Ubuntu-16.04"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: SpeedwayDeployment-${{ parameters.projectId }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      token=$(az account get-access-token --resource api://${{ parameters.deploymentApiApplicationId }} --query "accessToken" --output tsv)
+                      curl -i -m 1200 -X POST -H 'Accept: application/json' -H 'Content-Type: application/json' -H "Authorization: Bearer $token" --data '{ "speedwayProjectId": "${{ parameters.projectId }}", "buildId" : "$(Build.BuildId)", "environment": "$(Environment.Name)" }' ${{ parameters.deploymentApiUri }}/deploy
+                      echo "DONE"
+
+#  - stage: 'RunDevIntegrationTests'
+#    displayName: 'Run integration tests in dev'
+#    dependsOn:
+#      - Build
+#      - DeployToDev
+#    jobs:
+#      - job: 'CheckPipeline'
+#        variables:
+#          requiresIntegrationTest: $[ stageDependencies.Build.CreateArchive.outputs['RequiresIntegrationTestStage.RequiresIntegrationTest'] ]
+#        steps:
+#          - bash: echo "Did this run? $(requiresIntegrationTest)"
+#            name: RequiresIntegrationTestStage
+#
